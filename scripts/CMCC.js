@@ -105,7 +105,7 @@ if (isGetHeader) {
 
   if (!cookie) {
     console.log("[CMCC] Cookie not found in request headers");
-    $done({});
+    return $done({});
   }
 
   const saved = saveCookie(cookie);
