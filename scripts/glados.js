@@ -1,7 +1,7 @@
-/******************************
-脚本功能：GLaDOS / Railgun 自动签到 + 积分兑换
+/****************************** 
+脚本功能：GLaDOS / Railgun 自动签到
 更新时间：2026-05-27
-使用说明：访问 /console/account 抓包保存 Cookie，定时任务自动签到。
+说明：访问 /console/account 抓包保存 Cookie，定时自动签到。
          各域名独立 Cookie，支持多域名。
 
 [rewrite_local]
@@ -22,8 +22,6 @@ const EXCHANGE_PLAN = "plan500";
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 const isGetHeader = typeof $request !== "undefined";
-
-// ──── storage ────
 
 function safeJsonParse(s) {
   try { return JSON.parse(s); } catch (_) { return null; }
@@ -71,8 +69,6 @@ function getHost() {
   return h.Host || h.host || "";
 }
 
-// ──── network ────
-
 function fetchApi(url, method, cookie, domain, body) {
   const headers = {
     "Content-Type": "application/json;charset=UTF-8",
@@ -100,8 +96,6 @@ function fetchApi(url, method, cookie, domain, body) {
     })
   );
 }
-
-// ──── API ────
 
 async function doCheckin(cookie, domain) {
   const { data, raw, error } = await fetchApi(
@@ -146,8 +140,6 @@ async function doExchange(cookie, domain) {
   return data.code === 0 ? `成功(${EXCHANGE_PLAN})` : `失败: ${data.message || ""}`;
 }
 
-// ──── 单域名签到 ────
-
 async function runDomain(cookie, domain) {
   console.log(`[GLaDOS] ── ${domain} ──`);
 
@@ -184,8 +176,6 @@ async function runDomain(cookie, domain) {
   };
 }
 
-// ──── main ────
-
 if (isGetHeader) {
   const cookie = ($request.headers || {}).Cookie || ($request.headers || {}).cookie || "";
   const host = getHost();
@@ -200,7 +190,7 @@ if (isGetHeader) {
   }
   $done({});
 } else {
-  // 随机延迟 0~10s 防检测
+  
   const delay = Math.floor(Math.random() * 11);
   console.log(`[GLaDOS] 随机延迟 ${delay}s`);
   setTimeout(async () => {
@@ -224,7 +214,6 @@ if (isGetHeader) {
       results.push(await runDomain(cookie, domain));
     }
 
-    // 汇总
     const ok = results.filter((r) => r.code === 0).length;
     const dup = results.filter((r) => r.code === 1).length;
     const fail = results.filter((r) => r.code !== 0 && r.code !== 1).length;
