@@ -6,7 +6,7 @@
 
 | 首页预览 | 策略列表 | 重写规则 |
 | :---: | :---: | :---: |
-| <img src="./icons/home1.jpeg" width="280" /> | <img src="./icons/home2.jpeg" width="280" /> | <img src="./icons/rewrite.jpeg" width="280" /> |
+| <img src="https://cdn.jsdelivr.net/gh/curtinp118/QuantumultX@main/icons/home1.jpeg" width="280" /> | <img src="https://cdn.jsdelivr.net/gh/curtinp118/QuantumultX@main/icons/home2.jpeg" width="280" /> | <img src="https://cdn.jsdelivr.net/gh/curtinp118/QuantumultX@main/icons/rewrite.jpeg" width="280" /> |
 
 ## 📁 仓库结构
 
