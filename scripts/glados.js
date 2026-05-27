@@ -1,9 +1,9 @@
 /****************************** 
 脚本功能：GLaDOS / Railgun 自动签到 + 积分兑换
 更新时间：2026-05-27
-使用说明：先访问 GLaDOS 网站抓包保存 Cookie，再由定时任务自动签到。
-         支持 glados.network、railgun.info、glados.vip 三域名签到。
-         多账号用 & 分隔。
+使用说明：访问 GLaDOS 任意域名的 /console/account 页面抓包保存 Cookie，
+         定时任务自动对已保存 Cookie 的域名执行签到。
+         支持 glados.network、railgun.info、glados.vip，各域名独立 Cookie。
 
 [rewrite_local]
 ^https:\/\/glados\.network\/console\/account$ url script-request-header https://raw.githubusercontent.com/curtinp118/QuantumultX/refs/heads/main/scripts/glados.js
@@ -17,7 +17,8 @@
 hostname = %APPEND% glados.network, railgun.info, glados.vip
 *******************************/
 
-const COOKIE_KEY = "GLaDOS_Cookie";
+const COOKIE_KEY_PREFIX = "GLaDOS_Cookie";
+const DOMAINS_LIST_KEY = "GLaDOS_Domains";
 const DOMAINS = ["glados.network", "railgun.info", "glados.vip"];
 const EXCHANGE_PLAN = "plan500";
 const UA =
@@ -34,10 +35,41 @@ function safeJsonParse(str) {
   }
 }
 
-function getStoredCookies() {
+function cookieKeyFor(domain) {
+  return `${COOKIE_KEY_PREFIX}:${domain}`;
+}
+
+function getSavedDomains() {
+  try {
+    if (typeof $prefs === "undefined") return [];
+    const raw = $prefs.valueForKey(DOMAINS_LIST_KEY);
+    if (!raw) return [];
+    const list = safeJsonParse(raw) || [];
+    return Array.isArray(list) ? list.filter(Boolean) : [];
+  } catch (e) {
+    console.log("[GLaDOS] Error reading domains:", e);
+    return [];
+  }
+}
+
+function addDomain(domain) {
+  try {
+    if (typeof $prefs === "undefined") return;
+    const list = getSavedDomains();
+    if (!list.includes(domain)) {
+      list.push(domain);
+      $prefs.setValueForKey(JSON.stringify(list), DOMAINS_LIST_KEY);
+      console.log("[GLaDOS] Updated domains list:", list.join(", "));
+    }
+  } catch (e) {
+    console.log("[GLaDOS] Error adding domain:", e);
+  }
+}
+
+function getStoredCookie(domain) {
   try {
     if (typeof $prefs === "undefined") return "";
-    const raw = $prefs.valueForKey(COOKIE_KEY);
+    const raw = $prefs.valueForKey(cookieKeyFor(domain));
     return raw ? String(raw).trim() : "";
   } catch (e) {
     console.log("[GLaDOS] Error reading cookie:", e);
@@ -45,13 +77,14 @@ function getStoredCookies() {
   }
 }
 
-function saveCookie(cookie) {
+function saveCookie(domain, cookie) {
   try {
     if (typeof $prefs === "undefined" || !cookie) return false;
-    const old = getStoredCookies();
+    const old = getStoredCookie(domain);
     if (old !== cookie) {
-      $prefs.setValueForKey(cookie, COOKIE_KEY);
-      console.log("[GLaDOS] Cookie saved successfully");
+      $prefs.setValueForKey(cookie, cookieKeyFor(domain));
+      addDomain(domain);
+      console.log(`[GLaDOS] Cookie saved for ${domain}`);
       return true;
     }
     return false;
@@ -65,13 +98,18 @@ function notify(title, subtitle, body) {
   $notify(title, subtitle, body);
 }
 
+function getHostFromRequest() {
+  const h = ($request && $request.headers) || {};
+  return h.Host || h.host || "";
+}
+
 // ────────────────── HTTP ──────────────────
 
-function request(url, method, cookie, body) {
+function request(url, method, cookie, domain, body) {
   const headers = {
     "Content-Type": "application/json;charset=UTF-8",
-    Origin: "https://glados.network",
-    Referer: "https://glados.network/console/current",
+    Origin: `https://${domain}`,
+    Referer: `https://${domain}/console/current`,
     "User-Agent": UA,
     Cookie: cookie,
   };
@@ -102,7 +140,7 @@ async function checkin(cookie, domain) {
   const url = `https://${domain}/api/user/checkin`;
   const body = { token: domain };
   const { statusCode, data, raw, error } = await request(
-    url, "POST", cookie, body
+    url, "POST", cookie, domain, body
   );
 
   if (error) {
@@ -132,7 +170,7 @@ async function checkin(cookie, domain) {
 
 async function getStatus(cookie, domain) {
   const url = `https://${domain}/api/user/status`;
-  const { statusCode, data, raw, error } = await request(url, "GET", cookie);
+  const { statusCode, data, raw, error } = await request(url, "GET", cookie, domain);
 
   if (error || !data) {
     console.log(`[GLaDOS] ✗ 查询状态失败 [${domain}]: ${error || raw}`);
@@ -152,7 +190,7 @@ async function getStatus(cookie, domain) {
 
 async function getPoints(cookie, domain) {
   const url = `https://${domain}/api/user/points`;
-  const { statusCode, data, raw, error } = await request(url, "GET", cookie);
+  const { statusCode, data, raw, error } = await request(url, "GET", cookie, domain);
 
   if (error || !data) {
     console.log(`[GLaDOS] ✗ 查询积分失败 [${domain}]: ${error || raw}`);
@@ -174,7 +212,7 @@ async function exchange(cookie, domain, plan) {
   const url = `https://${domain}/api/user/exchange`;
   const body = { planType: plan };
   const { statusCode, data, raw, error } = await request(
-    url, "POST", cookie, body
+    url, "POST", cookie, domain, body
   );
 
   if (error || !data) {
@@ -194,90 +232,82 @@ async function exchange(cookie, domain, plan) {
   }
 }
 
-// ────────────────── 单账号签到流程 ──────────────────
+// ────────────────── 单域名签到流程 ──────────────────
 
-async function checkinForCookie(cookie, cookieIdx) {
-  const results = [];
+async function checkinForDomain(cookie, domain) {
+  console.log(`[GLaDOS] ── Domain: ${domain} ──`);
 
-  for (const domain of DOMAINS) {
-    console.log(`[GLaDOS] ── Cookie #${cookieIdx} | Domain: ${domain} ──`);
+  // 1. 查询签到前剩余天数
+  const statusBefore = await getStatus(cookie, domain);
+  // 2. 执行签到
+  const checkinResult = await checkin(cookie, domain);
+  // 3. 查询积分
+  const pointsResult = await getPoints(cookie, domain);
+  // 4. 兑换
+  const exchangeResult = await exchange(cookie, domain, EXCHANGE_PLAN);
+  // 5. 查询签到后剩余天数
+  const statusAfter = await getStatus(cookie, domain);
 
-    // 1. 查询签到前剩余天数
-    const statusBefore = await getStatus(cookie, domain);
-    // 2. 执行签到
-    const checkinResult = await checkin(cookie, domain);
-    // 3. 查询积分
-    const pointsResult = await getPoints(cookie, domain);
-    // 4. 兑换
-    const exchangeResult = await exchange(cookie, domain, EXCHANGE_PLAN);
-    // 5. 查询签到后剩余天数
-    const statusAfter = await getStatus(cookie, domain);
-
-    results.push({
-      cookieIdx,
-      domain,
-      status: checkinResult.status,
-      code: checkinResult.code,
-      message: checkinResult.message,
-      earnedPoints: checkinResult.points,
-      totalPoints: pointsResult.points,
-      daysBefore: statusBefore.leftDays,
-      daysAfter: statusAfter.leftDays,
-      exchange: exchangeResult,
-    });
-  }
-
-  return results;
+  return {
+    domain,
+    status: checkinResult.status,
+    code: checkinResult.code,
+    message: checkinResult.message,
+    earnedPoints: checkinResult.points,
+    totalPoints: pointsResult.points,
+    daysBefore: statusBefore.leftDays,
+    daysAfter: statusAfter.leftDays,
+    exchange: exchangeResult,
+  };
 }
 
 // ────────────────── 主流程 ──────────────────
 
 if (isGetHeader) {
-  // 抓包模式：从请求头提取 Cookie
+  // 抓包模式：从请求头提取 Cookie，按域名分别保存
   const allHeaders = $request.headers || {};
   const cookie = allHeaders.Cookie || allHeaders.cookie || "";
+  const host = getHostFromRequest();
 
-  if (!cookie) {
-    console.log("[GLaDOS] Cookie not found in request headers");
+  if (!cookie || !host) {
+    console.log("[GLaDOS] Cookie or Host not found in request headers");
     $done({});
   } else {
-    const saved = saveCookie(cookie);
+    const saved = saveCookie(host, cookie);
     if (saved) {
-      console.log("[GLaDOS] Cookie captured and saved");
-      notify("GLaDOS", "Cookie 已更新", "后续将用于自动签到");
+      console.log(`[GLaDOS] Cookie captured for ${host}`);
+      notify("GLaDOS", `Cookie 已更新 [${host}]`, "后续将用于自动签到");
     }
     $done({});
   }
 } else {
-  // 签到模式
+  // 签到模式：只对已保存 Cookie 的域名执行签到
   (async () => {
-    const storedCookie = getStoredCookies();
+    const savedDomains = getSavedDomains();
 
-    if (!storedCookie) {
-      console.log("[GLaDOS] No stored cookie found");
+    if (savedDomains.length === 0) {
+      console.log("[GLaDOS] No saved cookies found");
       notify(
         "GLaDOS 签到", "未获取到 Cookie",
-        "请先访问 GLaDOS 网站抓包保存 Cookie"
+        "请先访问 GLaDOS 网站 /console/account 抓包保存 Cookie"
       );
       return $done();
     }
 
-    // 支持多账号（& 分隔）
-    const cookieList = storedCookie
-      .split("&")
-      .map((c) => c.trim())
-      .filter(Boolean);
-
     console.log(
-      `[GLaDOS] 🚀 开始签到，共 ${cookieList.length} 个账号，${DOMAINS.length} 个域名`
+      `[GLaDOS] 🚀 开始签到，共 ${savedDomains.length} 个域名: ${savedDomains.join(", ")}`
     );
 
     const allResults = [];
 
-    for (let i = 0; i < cookieList.length; i++) {
-      console.log(`[GLaDOS] ═══ 开始处理 Cookie #${i + 1} ═══`);
-      const results = await checkinForCookie(cookieList[i], i + 1);
-      allResults.push(...results);
+    for (const domain of savedDomains) {
+      const cookie = getStoredCookie(domain);
+      if (!cookie) {
+        console.log(`[GLaDOS] ⚠️ ${domain} 的 Cookie 已丢失，跳过`);
+        continue;
+      }
+      const result = await checkinForDomain(cookie, domain);
+      allResults.push(result);
     }
 
     // ── 汇总通知 ──
@@ -293,7 +323,7 @@ if (isGetHeader) {
     const lines = allResults.map((r, i) => {
       const icon = r.code === 0 ? "✅" : r.code === 1 ? "🔄" : "❌";
       return [
-        `${icon} #${i + 1} ${r.domain}`,
+        `${icon} ${r.domain}`,
         `   签到: ${r.status}${r.earnedPoints !== "0" ? ` (+${r.earnedPoints})` : ""}`,
         `   天数: ${r.daysBefore} → ${r.daysAfter}`,
         `   积分: ${r.totalPoints}`,
