@@ -8,7 +8,6 @@
 QuantumultX/
 ├── README.md                          # 本文件
 ├── LICENSE                            # MIT 许可证
-├── AGENTS.md                          # 开发准则
 ├── profile/
 │   └── QX_Config.conf                 # 主配置文件
 ├── scripts/                           # 自动化脚本
