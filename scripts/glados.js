@@ -232,7 +232,12 @@ async function checkinForDomain(cookie, domain) {
   const statusBefore = await getStatus(cookie, domain);
   const checkinResult = await checkin(cookie, domain);
   const pointsResult = await getPoints(cookie, domain);
-  const exchangeResult = await exchange(cookie, domain, EXCHANGE_PLAN);
+  let exchangeResult = "跳过(积分不足)";
+  if (pointsResult.pointsNum >= 500) {
+    exchangeResult = await exchange(cookie, domain, EXCHANGE_PLAN);
+  } else {
+    console.log(`[GLaDOS] 积分 ${pointsResult.pointsNum} < 500，跳过兑换`);
+  }
   const statusAfter = await getStatus(cookie, domain);
 
   return {
