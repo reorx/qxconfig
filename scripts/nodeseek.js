@@ -1,6 +1,7 @@
 /******************************
 脚本功能：NS论坛签到
 更新时间：2026-01-17
+作者：Curtinp118
 *******************************
 [rewrite_local]
 ^https:\/\/www\.nodeseek\.com\/api\/account\/getInfo\/\d+\?readme=1$ url script-request-header https://raw.githubusercontent.com/curtinp118/QuantumultX/refs/heads/main/scripts/nodeseek.js
@@ -108,10 +109,7 @@ if (isGetHeader) {
     Accept: savedHeaders["Accept"] || "*/*",
   };
 
-  const body = "";
-  const myRequest = { url, method, headers, body };
-
-  $task.fetch(myRequest).then(
+  $task.fetch({ url, method, headers, body: "" }).then(
     (resp) => {
       const status = resp.statusCode;
       const body = resp.body || "";
