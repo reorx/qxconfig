@@ -1,6 +1,7 @@
-/****************************** 
+/******************************
 脚本功能：GLaDOS / Railgun 自动签到 + 积分兑换（多账号版）
 更新时间：2026-05-28
+作者：Curtinp118
 使用说明：访问 GLaDOS 任意域名的 /console/account 页面抓包保存 Cookie，定时任务自动对已保存 Cookie 的域名执行签到。
          支持 glados.network、railgun.info、glados.vip，各域名支持多账号。
          同一域名多次抓包可保存不同账号的 Cookie。
