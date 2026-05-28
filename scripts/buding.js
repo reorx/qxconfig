@@ -1,21 +1,22 @@
 /******************************
 脚本功能：布丁锁屏-解锁会员
 更新时间：2024-06-08
+作者：Curtinp118
 *******************************
 [rewrite_local]
 ^https:\/\/screen-lock\.sm-check\.com\/ url script-response-body https://raw.githubusercontent.com/curtinp118/QuantumultX/refs/heads/main/scripts/buding.js
-[mitm] 
+[mitm]
 hostname = screen-lock.sm-check.com
 *******************************/
 
-var aFengYe = $response.body;
-var obj =  JSON.parse(aFengYe);
+const body = JSON.parse($response.body);
 
-if($request.url.indexOf("/userApi/saveUser") != -1) {
-    obj.data.freeFlag = obj.data.newVipStatus = obj.data.vipStatus = 1;
-    obj.data.endTime = "2999-01-01";
-    obj.data.expireDate = 32472115200;
+if ($request.url.indexOf("/userApi/saveUser") !== -1) {
+  body.data.freeFlag = 1;
+  body.data.newVipStatus = 1;
+  body.data.vipStatus = 1;
+  body.data.endTime = "2999-01-01";
+  body.data.expireDate = 32472115200;
 }
 
-aFengYe = JSON.stringify(obj);
-$done(aFengYe);
+$done(JSON.stringify(body));
