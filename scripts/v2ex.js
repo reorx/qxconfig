@@ -1,8 +1,8 @@
 
-
 /******************************
 脚本功能：V2EX 每日签到
 更新时间：2026-04-29
+作者：Curtinp118
 使用说明：先访问 V2EX 个人主页保存 Cookie，再由定时任务自动签到。
 
 [rewrite_local]
@@ -96,12 +96,8 @@ function formatBalance(html) {
 function fetchUrl(url, headers) {
   return new Promise((resolve, reject) => {
     $task.fetch({ url, headers, method: "GET" }).then(
-      (resp) => {
-        resolve(resp.body || "");
-      },
-      (reason) => {
-        reject(reason);
-      }
+      (resp) => resolve(resp.body || ""),
+      (reason) => reject(reason)
     );
   });
 }
