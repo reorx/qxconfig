@@ -1,9 +1,9 @@
 /****************************** 
-脚本功能：GLaDOS / Railgun 自动签到 + 积分兑换
-更新时间：2026-05-27
-使用说明：访问 GLaDOS 任意域名的 /console/account 页面抓包保存 Cookie，
-         定时任务自动对已保存 Cookie 的域名执行签到。
-         支持 glados.network、railgun.info、glados.vip，各域名独立 Cookie。
+脚本功能：GLaDOS / Railgun 自动签到 + 积分兑换（多账号版）
+更新时间：2026-05-28
+使用说明：访问 GLaDOS 任意域名的 /console/account 页面抓包保存 Cookie，定时任务自动对已保存 Cookie 的域名执行签到。
+         支持 glados.network、railgun.info、glados.vip，各域名支持多账号。
+         同一域名多次抓包可保存不同账号的 Cookie。
 
 [rewrite_local]
 ^https:\/\/glados\.network\/console\/account$ url script-request-header https://raw.githubusercontent.com/curtinp118/QuantumultX/refs/heads/main/scripts/glados.js
@@ -17,7 +17,7 @@
 hostname = %APPEND% glados.network, railgun.info, glados.vip
 *******************************/
 
-const COOKIE_KEY_PREFIX = "GLaDOS_Cookie";
+const COOKIES_KEY_PREFIX = "GLaDOS_Cookies";
 const DOMAINS_LIST_KEY = "GLaDOS_Domains";
 const DOMAINS = ["glados.network", "railgun.info", "glados.vip"];
 const EXCHANGE_PLAN = "plan500";
@@ -33,8 +33,10 @@ function safeJsonParse(str) {
   }
 }
 
-function cookieKeyFor(domain) {
-  return `${COOKIE_KEY_PREFIX}:${domain}`;
+// ─── Storage: per-domain cookie array ───
+
+function cookiesKeyFor(domain) {
+  return `${COOKIES_KEY_PREFIX}:${domain}`;
 }
 
 function getSavedDomains() {
@@ -57,40 +59,45 @@ function addDomain(domain) {
     if (!list.includes(domain)) {
       list.push(domain);
       $prefs.setValueForKey(JSON.stringify(list), DOMAINS_LIST_KEY);
-      console.log("[GLaDOS] Updated domains list:", list.join(", "));
     }
   } catch (e) {
     console.log("[GLaDOS] Error adding domain:", e);
   }
 }
 
-function getStoredCookie(domain) {
+function getCookiesForDomain(domain) {
   try {
-    if (typeof $prefs === "undefined") return "";
-    const raw = $prefs.valueForKey(cookieKeyFor(domain));
-    return raw ? String(raw).trim() : "";
+    if (typeof $prefs === "undefined") return [];
+    const raw = $prefs.valueForKey(cookiesKeyFor(domain));
+    if (!raw) return [];
+    const list = safeJsonParse(raw);
+    return Array.isArray(list) ? list.filter(Boolean) : [];
   } catch (e) {
-    console.log("[GLaDOS] Error reading cookie:", e);
-    return "";
+    console.log("[GLaDOS] Error reading cookies:", e);
+    return [];
   }
 }
 
 function saveCookie(domain, cookie) {
   try {
-    if (typeof $prefs === "undefined" || !cookie) return false;
-    const old = getStoredCookie(domain);
-    if (old !== cookie) {
-      $prefs.setValueForKey(cookie, cookieKeyFor(domain));
-      addDomain(domain);
-      console.log(`[GLaDOS] Cookie saved for ${domain}`);
-      return true;
+    if (typeof $prefs === "undefined" || !cookie)
+      return { isNew: false, index: -1 };
+    const cookies = getCookiesForDomain(domain);
+    const existingIdx = cookies.indexOf(cookie);
+    if (existingIdx !== -1) {
+      return { isNew: false, index: existingIdx };
     }
-    return false;
+    cookies.push(cookie);
+    $prefs.setValueForKey(JSON.stringify(cookies), cookiesKeyFor(domain));
+    addDomain(domain);
+    return { isNew: true, index: cookies.length - 1 };
   } catch (e) {
     console.log("[GLaDOS] Error saving cookie:", e);
-    return false;
+    return { isNew: false, index: -1 };
   }
 }
+
+// ─── Helpers ───
 
 function notify(title, subtitle, body) {
   $notify(title, subtitle, body);
@@ -130,6 +137,8 @@ function request(url, method, cookie, domain, body) {
   );
 }
 
+// ─── API ───
+
 async function checkin(cookie, domain) {
   const url = `https://${domain}/api/user/checkin`;
   const body = { token: domain };
@@ -164,7 +173,9 @@ async function checkin(cookie, domain) {
 
 async function getStatus(cookie, domain) {
   const url = `https://${domain}/api/user/status`;
-  const { statusCode, data, raw, error } = await request(url, "GET", cookie, domain);
+  const { statusCode, data, raw, error } = await request(
+    url, "GET", cookie, domain
+  );
 
   if (error || !data) {
     console.log(`[GLaDOS] ✗ 查询状态失败 [${domain}]: ${error || raw}`);
@@ -184,7 +195,9 @@ async function getStatus(cookie, domain) {
 
 async function getPoints(cookie, domain) {
   const url = `https://${domain}/api/user/points`;
-  const { statusCode, data, raw, error } = await request(url, "GET", cookie, domain);
+  const { statusCode, data, raw, error } = await request(
+    url, "GET", cookie, domain
+  );
 
   if (error || !data) {
     console.log(`[GLaDOS] ✗ 查询积分失败 [${domain}]: ${error || raw}`);
@@ -226,8 +239,8 @@ async function exchange(cookie, domain, plan) {
   }
 }
 
-async function checkinForDomain(cookie, domain) {
-  console.log(`[GLaDOS] ── Domain: ${domain} ──`);
+async function checkinForAccount(cookie, domain, accountLabel) {
+  console.log(`[GLaDOS] ── ${accountLabel} | ${domain} ──`);
 
   const statusBefore = await getStatus(cookie, domain);
   const checkinResult = await checkin(cookie, domain);
@@ -241,6 +254,7 @@ async function checkinForDomain(cookie, domain) {
   const statusAfter = await getStatus(cookie, domain);
 
   return {
+    accountLabel,
     domain,
     status: checkinResult.status,
     code: checkinResult.code,
@@ -253,6 +267,8 @@ async function checkinForDomain(cookie, domain) {
   };
 }
 
+// ─── Main ───
+
 if (isGetHeader) {
   const allHeaders = $request.headers || {};
   const cookie = allHeaders.Cookie || allHeaders.cookie || "";
@@ -260,12 +276,17 @@ if (isGetHeader) {
 
   if (!cookie || !host) {
     console.log("[GLaDOS] Cookie or Host not found in request headers");
+    notify("GLaDOS", "抓包失败", "未获取到 Cookie 或 Host，请检查重写配置");
     $done({});
   } else {
-    const saved = saveCookie(host, cookie);
-    if (saved) {
-      console.log(`[GLaDOS] Cookie captured for ${host}`);
-      notify("GLaDOS", `Cookie 已更新 [${host}]`, "后续将用于自动签到");
+    const { isNew, index } = saveCookie(host, cookie);
+    const label = `账号 #${index + 1}`;
+    if (isNew) {
+      console.log(`[GLaDOS] ${label} Cookie saved for ${host}`);
+      notify("GLaDOS", `${label} 已保存 [${host}]`, "新账号 Cookie 已记录，将用于自动签到");
+    } else {
+      console.log(`[GLaDOS] ${label} Cookie already exists for ${host}`);
+      notify("GLaDOS", `${label} 已存在 [${host}]`, "该 Cookie 已保存过，无需重复抓包");
     }
     $done({});
   }
@@ -281,17 +302,24 @@ if (isGetHeader) {
       return $done();
     }
 
-    console.log(`[GLaDOS] 🚀 开始签到 ${savedDomains.join(", ")}`);
     const allResults = [];
+    let totalAccounts = 0;
 
     for (const domain of savedDomains) {
-      const cookie = getStoredCookie(domain);
-      if (!cookie) {
-        console.log(`[GLaDOS] ⚠️ ${domain} Cookie 丢失，跳过`);
+      const cookies = getCookiesForDomain(domain);
+      if (cookies.length === 0) {
+        console.log(`[GLaDOS] ⚠️ ${domain} 无 Cookie，跳过`);
         continue;
       }
-      allResults.push(await checkinForDomain(cookie, domain));
+      for (let i = 0; i < cookies.length; i++) {
+        totalAccounts++;
+        const label = `账号 #${i + 1}`;
+        console.log(`[GLaDOS] ═══ ${label} | ${domain} ═══`);
+        allResults.push(await checkinForAccount(cookies[i], domain, label));
+      }
     }
+
+    console.log(`[GLaDOS] 🚀 共 ${totalAccounts} 个账号`);
 
     const ok = allResults.filter((r) => r.code === 0).length;
     const dup = allResults.filter((r) => r.code === 1).length;
@@ -300,10 +328,10 @@ if (isGetHeader) {
     const lines = allResults.map((r) => {
       const icon = r.code === 0 ? "✅" : r.code === 1 ? "🔄" : "❌";
       const pts = r.earnedPoints !== "0" ? ` +${r.earnedPoints}` : "";
-      return `${icon} ${r.domain} | ${r.status}${pts} | ${r.daysBefore}→${r.daysAfter} | ${r.totalPoints}积分`;
+      return `${icon} ${r.accountLabel} ${r.domain} | ${r.status}${pts} | ${r.daysBefore}→${r.daysAfter} | ${r.totalPoints}积分`;
     });
 
-    const title = `GLaDOS | 成${ok} 重${dup} 败${fail}`;
+    const title = `GLaDOS | ${totalAccounts}账号 成${ok} 重${dup} 败${fail}`;
     const content = lines.join("\n");
 
     console.log(`\n[GLaDOS] ═══ 签到结果 ═══\n${content}\n`);
