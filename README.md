@@ -1,6 +1,6 @@
 # Quantumult X 配置库
 
-一个精心维护的 Quantumult X 配置文件和自动化脚本集合。
+Quantumult X 配置文件集合，脚本已迁移至 [Scripthub](https://github.com/curtinp118/Scripthub) 统一管理。
 
 ## 📱 配置预览
 
@@ -16,29 +16,25 @@ QuantumultX/
 ├── LICENSE                            # MIT 许可证
 ├── profile/
 │   └── QX_Config.conf                 # 主配置文件
-├── scripts/                           # 自动化脚本
-│   ├── new-api.js                     # NewAPI 中转站通用签到
-│   ├── v2ex.js                        # V2EX 每日签到
-│   ├── glados.js                      # GLaDOS / Railgun 签到 + 积分兑换
-│   ├── cd-rail.js                     # 成都地铁签到
-│   ├── cmcc.js                        # 中国移动签到
-│   ├── nodeseek.js                    # NodeSeek 论坛签到
-│   ├── buding.js                      # 布丁锁屏解锁
-│   ├── caiyun.js                      # 彩云天气解锁
-│   ├── nicegram.js                    # Nicegram 解锁
-│   ├── dreamface.js                   # DreamFace 解锁
-│   └── notability.js                  # Notability 解锁
+├── scripts/                           # 脚本配置（远程引用 Scripthub）
+│   ├── glados.conf                    # GLaDOS / Railgun 签到
+│   ├── v2ex.conf                      # V2EX 每日签到
+│   ├── new-api.conf                   # NewAPI 通用签到
+│   ├── cd-rail.conf                   # 成都地铁签到
+│   ├── cmcc.conf                      # 中国移动签到
+│   ├── nodeseek.conf                  # NodeSeek 论坛签到
+│   ├── buding.conf                    # 布丁锁屏解锁
+│   ├── caiyun.conf                    # 彩云天气解锁
+│   ├── nicegram.conf                  # Nicegram 解锁
+│   ├── dreamface.conf                 # DreamFace 解锁
+│   └── notability.conf                # Notability 解锁
 ├── rules/                             # 本地规则文件
 │   ├── AI.list                        # AI 服务规则
 │   └── AppleIntelligence.list         # 苹果智能服务规则
 └── icons/                             # 策略图标
-    ├── set.png                        # 仓库头像
-    ├── Curtin.jpg
-    ├── lightning-full.png
-    ├── home1.jpeg                     # 首页预览
-    ├── home2.jpeg                     # 策略列表预览
-    └── rewrite.jpeg                   # 重写规则预览
 ```
+
+> 脚本统一在 [curtinp118/Scripthub](https://github.com/curtinp118/Scripthub) 管理，本仓库通过 `.conf` 文件远程引用。
 
 ## ✨ 主要特性
 
@@ -56,15 +52,36 @@ QuantumultX/
 - **AI 服务**：OpenAI、Claude、Gemini、Copilot、Perplexity 等全覆盖
 - **广告拦截**：多个高质量广告过滤规则
 
-### 📜 自动化脚本
-- **签到类**：NewAPI 通用签到、V2EX、GLaDOS/Railgun、成都地铁、中国移动、NodeSeek
-- **解锁类**：布丁锁屏、彩云天气、Nicegram、DreamFace、Notability
-
 ### 🔄 重写规则
 - YouTube 字幕/去广告
 - 闲鱼、小红书、高德地图去广告
 - Reddit 功能增强
 - Spotify 增强
+
+## 📜 脚本列表
+
+所有脚本统一在 [Scripthub](https://github.com/curtinp118/Scripthub) 管理，支持 QX / Loon / Surge 三端。
+
+### 签到类
+
+| 脚本 | 功能 | 使用方法 |
+|------|------|----------|
+| `new-api.js` | NewAPI 中转站通用签到 | 先抓包保存 `/api/user/self` 的 Cookie，支持多站点多账户 |
+| `v2ex.js` | V2EX 每日签到 | 访问 V2EX 个人主页保存 Cookie |
+| `glados.js` | GLaDOS / Railgun 签到 + 积分兑换 | 访问控制台抓包保存 Cookie，支持多域名多账户 |
+| `cd-rail.js` | 成都地铁签到 | 打开成都地铁 App 签到页面保存请求头 |
+| `cmcc.js` | 中国移动签到 | 打开移动 App 签到页面保存 Cookie |
+| `nodeseek.js` | NodeSeek 论坛签到 | 访问 NodeSeek 个人页面保存请求头 |
+
+### 解锁类
+
+| 脚本 | 功能 | 说明 |
+|------|------|------|
+| `buding.js` | 布丁锁屏解锁 | 需要 MITM |
+| `caiyun.js` | 彩云天气解锁 | 需要 MITM |
+| `nicegram.js` | Nicegram 解锁 | 需要 MITM |
+| `dreamface.js` | DreamFace 解锁 | 需要 MITM |
+| `notability.js` | Notability 解锁 | 需要 MITM |
 
 ## 🚀 快速开始
 
@@ -93,29 +110,6 @@ QuantumultX/
 
 编辑 `[task_local]` 部分启用需要的自动签到脚本（默认 disabled）。
 
-## 📜 脚本使用说明
-
-### 签到类脚本
-
-| 脚本 | 功能 | 使用方法 |
-|------|------|----------|
-| `new-api.js` | NewAPI 中转站通用签到 | 先抓包保存 `/api/user/self` 的 Cookie，支持多站点多账户 |
-| `v2ex.js` | V2EX 每日签到 | 访问 V2EX 个人主页保存 Cookie |
-| `glados.js` | GLaDOS / Railgun 签到 + 积分兑换 | 访问 glados.network/railgun.info/glaDos.vip 任意域名控制台抓包保存 Cookie，支持多域名多账户 |
-| `cd-rail.js` | 成都地铁签到 | 打开成都地铁 App 签到页面保存请求头 |
-| `cmcc.js` | 中国移动签到 | 打开移动 App 签到页面保存 Cookie |
-| `nodeseek.js` | NodeSeek 论坛签到 | 访问 NodeSeek 个人页面保存请求头 |
-
-### 解锁类脚本
-
-| 脚本 | 功能 | 说明 |
-|------|------|------|
-| `buding.js` | 布丁锁屏解锁 | 需要 MITM |
-| `caiyun.js` | 彩云天气解锁 | 需要 MITM |
-| `nicegram.js` | Nicegram 解锁 | 需要 MITM |
-| `dreamface.js` | DreamFace 解锁 | 需要 MITM |
-| `notability.js` | Notability 解锁 | 需要 MITM |
-
 ## 🌐 策略说明
 
 | 策略 | 用途 | 节点选择 |
@@ -142,6 +136,8 @@ QuantumultX/
 
 ## 🤝 相关资源
 
+- [Scripthub 脚本库](https://github.com/curtinp118/Scripthub) — 统一脚本管理
+- [Loon 配置库](https://github.com/curtinp118/Loon) — Loon 配置
 - [Quantumult X 官方网站](https://quantumultx.com)
 - [iOS 规则脚本库 - blackmatrix7](https://github.com/blackmatrix7/ios_rule_script)
 - [资源解析与脚本 - KOP-XIAO](https://github.com/KOP-XIAO/QuantumultX)
@@ -160,4 +156,4 @@ QuantumultX/
 
 ---
 
-**最后更新**: 2026-05-28
+**最后更新**: 2026-05-31
