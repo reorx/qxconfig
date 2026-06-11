@@ -18,3 +18,11 @@ HOST,api.smoot.apple.com,no-policy
 HOST,binary-blob-repository.apple.com,no-policy
 HOST,guzzoni.apple.com,no-policy
 HOST,p106-keyvalueservice.icloud.com,no-policy
+HOST-SUFFIX,smoot.apple.com,no-policy
+HOST-SUFFIX,gateway.icloud.com,no-policy
+HOST-SUFFIX,apple-relay.apple.com,no-policy
+HOST-SUFFIX,apple-relay.fastly-edge.com,no-policy
+HOST-SUFFIX,apple-relay.cloudflare.com,no-policy
+HOST-SUFFIX,cp4.cloudflare.com,no-policy
+HOST-SUFFIX,apple-relay.akamaized.net,no-policy
+HOST-SUFFIX,apple-relay.mask.apple-dns.net,no-policy
