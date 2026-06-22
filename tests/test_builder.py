@@ -31,6 +31,13 @@ SOURCE = textwrap.dedent(
 
     [filter_local]
     final, Final
+
+    # 定时任务
+    [task_local]
+    event-interaction https://example.com/check.js, tag = T, enabled = true
+
+    [mitm]
+    hostname = -x.com
     """
 )
 
@@ -234,6 +241,24 @@ def test_disable_rewrite_remote_excludes_section_and_skips_download(tmp_path):
     # neighbouring sections are unaffected
     assert result.filter_count == 1
     assert "rules/raw.githubusercontent.com/foo/bar/China.list" in text
+    assert "[filter_local]" in text
+    assert "[task_local]" in text
+
+
+def test_disable_task_local_excludes_whole_section(tmp_path):
+    src, clash, out = _write_inputs(tmp_path)
+    build(src, "http://b", clash, out, fetcher=lambda u: b"x", disable_task_local=True)
+    text = (out / "QX_Config.conf").read_text(encoding="utf-8")
+
+    # section, its body, and its descriptive comment are gone
+    assert "[task_local]" not in text
+    assert "event-interaction" not in text
+    assert "# 定时任务" not in text
+
+    # the next section's header survives intact
+    assert "[mitm]" in text
+    assert "hostname = -x.com" in text
+    # an earlier section is untouched too
     assert "[filter_local]" in text
 
 

@@ -44,6 +44,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Exclude the whole [rewrite_remote] section (and skip downloading its rules)",
     )
     parser.add_argument(
+        "--disable-task-local",
+        action="store_true",
+        help="Exclude the whole [task_local] section",
+    )
+    parser.add_argument(
         "--server-remote",
         nargs="?",
         const="lan",
@@ -62,6 +67,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.disable_rewrite_remote:
         print("Excluding [rewrite_remote] section.", file=sys.stderr)
+    if args.disable_task_local:
+        print("Excluding [task_local] section.", file=sys.stderr)
     print("Mirroring remote resources (cached files skipped; --force to refresh)...", file=sys.stderr)
     try:
         result = build(
@@ -72,6 +79,7 @@ def main(argv: list[str] | None = None) -> int:
             progress=progress,
             force=args.force,
             disable_rewrite_remote=args.disable_rewrite_remote,
+            disable_task_local=args.disable_task_local,
             server_remote=args.server_remote,
         )
     except Exception as exc:  # noqa: BLE001 - top-level boundary

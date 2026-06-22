@@ -36,6 +36,7 @@ def build(
     progress: Progress | None = None,
     force: bool = False,
     disable_rewrite_remote: bool = False,
+    disable_task_local: bool = False,
     server_remote: str | None = None,
 ) -> BuildResult:
     source = Path(source)
@@ -47,6 +48,8 @@ def build(
     excluded = set()
     if disable_rewrite_remote:
         excluded.add("rewrite_remote")
+    if disable_task_local:
+        excluded.add("task_local")
 
     lines = source.read_text(encoding="utf-8").splitlines()
     out_lines, resources = _rewrite_resource_lines(lines, base, excluded)
