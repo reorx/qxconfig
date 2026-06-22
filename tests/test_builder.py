@@ -18,6 +18,9 @@ SOURCE = textwrap.dedent(
     [server_local]
     ;anytls = ADDR:PORT, password = pwd, over-tls = true, tag = sample
 
+    [server_remote]
+    ;https://isp.example.com/sub tag = ISP, enabled = true
+
     [filter_remote]
     https://raw.githubusercontent.com/foo/bar/China.list, tag = CN, force-policy = direct, enabled = true
     ;https://disabled.example.com/off.list, tag = Off, enabled = false
@@ -165,6 +168,44 @@ def test_existing_files_are_not_redownloaded(tmp_path):
     assert len(calls) == after_first  # nothing re-fetched on the second run
     assert second.downloaded_count == 0
     assert second.cached_count == 2
+
+
+def test_server_remote_mode_copies_clash_and_writes_subscription(tmp_path):
+    src, clash, out = _write_inputs(tmp_path)
+
+    result = build(
+        src, "http://b", clash, out, fetcher=lambda u: b"x", server_remote="lan"
+    )
+    text = (out / "QX_Config.conf").read_text(encoding="utf-8")
+
+    # the Clash config is copied verbatim under clash/
+    copied = out / "clash" / "clash.yaml"
+    assert copied.read_bytes() == clash.read_bytes()
+
+    # [server_remote] entry in QX syntax: space before tag=, commas after
+    assert (
+        "http://b/clash/clash.yaml tag=lan, "
+        "update-interval=172800, opt-parser=true, enabled=true"
+    ) in text
+    assert result.server_remote_url == "http://b/clash/clash.yaml"
+
+    # no nodes converted into [server_local]
+    assert "shadowsocks=1.2.3.4:8388" not in text
+    assert "anytls=sg.example.com:9000" not in text
+    assert result.node_count == 0
+    assert result.skipped == []
+
+    # the original [server_local] sample comment is untouched
+    assert ";anytls = ADDR:PORT" in text
+    # filter rules are still mirrored as usual
+    assert result.filter_count == 1
+
+
+def test_server_remote_accepts_custom_tag(tmp_path):
+    src, clash, out = _write_inputs(tmp_path)
+    build(src, "http://b", clash, out, fetcher=lambda u: b"x", server_remote="prod")
+    text = (out / "QX_Config.conf").read_text(encoding="utf-8")
+    assert "http://b/clash/clash.yaml tag=prod," in text
 
 
 def test_force_redownloads_existing_files(tmp_path):

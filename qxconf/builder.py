@@ -35,6 +35,7 @@ def build(
     fetcher: Fetcher = default_fetcher,
     progress: Progress | None = None,
     force: bool = False,
+    server_remote: str | None = None,
 ) -> BuildResult:
     source = Path(source)
     clash_path = Path(clash_path)
@@ -45,16 +46,24 @@ def build(
     lines = source.read_text(encoding="utf-8").splitlines()
     out_lines, resources = _rewrite_resource_lines(lines, base)
 
-    results = convert_proxies(load_proxies(clash_path.read_text(encoding="utf-8")))
-    node_lines = [r.line for r in results if r.supported]
-    skipped = [
-        SkippedProxy(name=r.name, type=r.type, reason=r.reason or "")
-        for r in results
-        if not r.supported
-    ]
-    out_lines = _inject_nodes(out_lines, node_lines, clash_path.name)
-
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    if server_remote:
+        out_lines, server_remote_url = _use_server_remote(
+            out_lines, base, clash_path, out_dir, tag=server_remote
+        )
+        node_count, skipped = 0, []
+    else:
+        results = convert_proxies(load_proxies(clash_path.read_text(encoding="utf-8")))
+        node_lines = [r.line for r in results if r.supported]
+        skipped = [
+            SkippedProxy(name=r.name, type=r.type, reason=r.reason or "")
+            for r in results
+            if not r.supported
+        ]
+        out_lines = _inject_nodes(out_lines, node_lines, clash_path.name)
+        node_count, server_remote_url = len(node_lines), None
+
     downloaded, cached = _download_resources(resources, out_dir, fetcher, progress, force)
 
     config_path = out_dir / source.name
@@ -64,10 +73,11 @@ def build(
         config_path=str(config_path),
         filter_count=sum(r.section == "filter_remote" for r in resources),
         rewrite_count=sum(r.section == "rewrite_remote" for r in resources),
-        node_count=len(node_lines),
+        node_count=node_count,
         downloaded_count=downloaded,
         cached_count=cached,
         skipped=skipped,
+        server_remote_url=server_remote_url,
     )
 
 
@@ -113,6 +123,34 @@ def _inject_nodes(out_lines: list[str], node_lines: list[str], clash_name: str) 
     # Attach directly under the [server_local] header so the nodes are clearly
     # part of that section, leaving trailing comments (which belong to the next
     # section) in place.
+    return out_lines[: header_idx + 1] + block + out_lines[header_idx + 1 :]
+
+
+def _use_server_remote(
+    out_lines: list[str], base: str, clash_path: Path, out_dir: Path, tag: str
+) -> tuple[list[str], str]:
+    """Copy the Clash config under clash/ and reference it from [server_remote]."""
+    clash_dest = out_dir / "clash" / clash_path.name
+    clash_dest.parent.mkdir(parents=True, exist_ok=True)
+    clash_dest.write_bytes(clash_path.read_bytes())
+
+    url = f"{base}/clash/{clash_path.name}"
+    # QX [server_remote] syntax: a space before tag=, commas between the rest.
+    line = f"{url} tag={tag}, update-interval=172800, opt-parser=true, enabled=true"
+    return _inject_server_remote(out_lines, line, clash_path.name), url
+
+
+def _inject_server_remote(
+    out_lines: list[str], remote_line: str, clash_name: str
+) -> list[str]:
+    block = [f"# Subscription injected from {clash_name}", remote_line, ""]
+
+    header_idx = next(
+        (i for i, ln in enumerate(out_lines) if section_name(ln) == "server_remote"),
+        None,
+    )
+    if header_idx is None:
+        return out_lines + ["", "[server_remote]", *block]
     return out_lines[: header_idx + 1] + block + out_lines[header_idx + 1 :]
 
 

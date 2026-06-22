@@ -38,6 +38,18 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Re-download rules even if already present in the output directory",
     )
+    parser.add_argument(
+        "--server-remote",
+        nargs="?",
+        const="lan",
+        default=None,
+        metavar="TAG",
+        help=(
+            "Instead of converting nodes into [server_local], copy the Clash "
+            "config to <output>/clash/ and reference it from [server_remote] "
+            "(served at <base-url>/clash/<file>). Optional TAG, default 'lan'."
+        ),
+    )
     args = parser.parse_args(argv)
 
     def progress(index: int, total: int, url: str) -> None:
@@ -52,6 +64,7 @@ def main(argv: list[str] | None = None) -> int:
             out_dir=args.output,
             progress=progress,
             force=args.force,
+            server_remote=args.server_remote,
         )
     except Exception as exc:  # noqa: BLE001 - top-level boundary
         print(f"error: {exc}", file=sys.stderr)
@@ -67,6 +80,9 @@ def _report(result: BuildResult) -> None:
     print(f"  rewrite rules mirrored: {result.rewrite_count}")
     print(f"    downloaded          : {result.downloaded_count}")
     print(f"    reused (cached)     : {result.cached_count}")
+    if result.server_remote_url:
+        print(f"  node subscription     : {result.server_remote_url}")
+        return
     print(f"  nodes injected        : {result.node_count}")
     if result.skipped:
         print(f"  nodes skipped         : {len(result.skipped)}")

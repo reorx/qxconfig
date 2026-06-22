@@ -63,3 +63,4 @@ class BuildResult(BaseModel):
     downloaded_count: int = 0
     cached_count: int = 0
     skipped: list[SkippedProxy] = []
+    server_remote_url: str | None = None

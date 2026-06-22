@@ -18,6 +18,16 @@ Disabled lines (`enabled=false` or commented with `;`/`#`) are left untouched
 and never downloaded. Unsupported proxy types/plugins (e.g. `shadow-tls`) are
 skipped and reported instead of producing broken nodes.
 
+With `--server-remote [TAG]` the nodes are not converted; instead the Clash
+config is copied to `<output>/clash/` and referenced as a `[server_remote]`
+subscription (`<base-url>/clash/<file>`), letting Quantumult X parse it on its
+side. `TAG` defaults to `lan`. Example output line:
+
+```
+[server_remote]
+http://192.168.1.140:8888/clash/local-unified.yaml tag=lan, update-interval=172800, opt-parser=true, enabled=true
+```
+
 ## Usage
 
 ```bash
