@@ -35,6 +35,7 @@ def build(
     fetcher: Fetcher = default_fetcher,
     progress: Progress | None = None,
     force: bool = False,
+    disable_rewrite_remote: bool = False,
     server_remote: str | None = None,
 ) -> BuildResult:
     source = Path(source)
@@ -43,8 +44,13 @@ def build(
     base = base_url.rstrip("/")
     progress = progress or (lambda *a: None)
 
+    excluded = set()
+    if disable_rewrite_remote:
+        excluded.add("rewrite_remote")
+
     lines = source.read_text(encoding="utf-8").splitlines()
-    out_lines, resources = _rewrite_resource_lines(lines, base)
+    out_lines, resources = _rewrite_resource_lines(lines, base, excluded)
+    out_lines = _exclude_sections(out_lines, excluded)
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -82,7 +88,7 @@ def build(
 
 
 def _rewrite_resource_lines(
-    lines: list[str], base: str
+    lines: list[str], base: str, excluded: set[str] = frozenset()
 ) -> tuple[list[str], list[RemoteResource]]:
     out_lines: list[str] = []
     resources: list[RemoteResource] = []
@@ -95,7 +101,13 @@ def _rewrite_resource_lines(
             out_lines.append(line)
             continue
 
-        if current in REMOTE_SECTIONS and is_resource_line(line):
+        # Excluded sections are passed through here and dropped wholesale by
+        # _exclude_sections later, so don't collect their rules for download.
+        if (
+            current in REMOTE_SECTIONS
+            and current not in excluded
+            and is_resource_line(line)
+        ):
             url = resource_url(line)
             relpath = url_to_relpath(url, REMOTE_SECTIONS[current])
             new_url = f"{base}/{relpath}"
@@ -108,6 +120,46 @@ def _rewrite_resource_lines(
         out_lines.append(line)
 
     return out_lines, resources
+
+
+def _exclude_sections(lines: list[str], excluded: set[str]) -> list[str]:
+    for name in excluded:
+        lines = _remove_section(lines, name)
+    return lines
+
+
+def _remove_section(lines: list[str], name: str) -> list[str]:
+    """Remove a whole section: its header, body, and own descriptive comment.
+
+    A trailing run of comments/blanks before the next header belongs to that
+    next section and is preserved.
+    """
+    header_idx = next(
+        (i for i, ln in enumerate(lines) if section_name(ln) == name), None
+    )
+    if header_idx is None:
+        return lines
+
+    # Extend the start upward over the section's own comment header + the blank
+    # separator above it.
+    start = header_idx
+    while start > 0 and lines[start - 1].lstrip().startswith("#"):
+        start -= 1
+    while start > 0 and lines[start - 1].strip() == "":
+        start -= 1
+
+    # End at the next section header, then walk back so the comment/blank run
+    # that introduces that next section is kept.
+    end = next(
+        (j for j in range(header_idx + 1, len(lines)) if section_name(lines[j])),
+        len(lines),
+    )
+    while end - 1 > header_idx and (
+        lines[end - 1].strip() == "" or lines[end - 1].lstrip().startswith("#")
+    ):
+        end -= 1
+
+    return lines[:start] + lines[end:]
 
 
 def _inject_nodes(out_lines: list[str], node_lines: list[str], clash_name: str) -> list[str]:

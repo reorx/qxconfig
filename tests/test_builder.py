@@ -25,6 +25,7 @@ SOURCE = textwrap.dedent(
     https://raw.githubusercontent.com/foo/bar/China.list, tag = CN, force-policy = direct, enabled = true
     ;https://disabled.example.com/off.list, tag = Off, enabled = false
 
+    # 远程重写规则
     [rewrite_remote]
     https://example.com/path/rw.snippet, tag = RW, enabled = true
 
@@ -206,6 +207,34 @@ def test_server_remote_accepts_custom_tag(tmp_path):
     build(src, "http://b", clash, out, fetcher=lambda u: b"x", server_remote="prod")
     text = (out / "QX_Config.conf").read_text(encoding="utf-8")
     assert "http://b/clash/clash.yaml tag=prod," in text
+
+
+def test_disable_rewrite_remote_excludes_section_and_skips_download(tmp_path):
+    src, clash, out = _write_inputs(tmp_path)
+    calls = []
+
+    def fetch(url: str) -> bytes:
+        calls.append(url)
+        return b"data"
+
+    result = build(
+        src, "http://b", clash, out, fetcher=fetch, disable_rewrite_remote=True
+    )
+    text = (out / "QX_Config.conf").read_text(encoding="utf-8")
+
+    # whole section gone (header + its descriptive comment), nothing fetched
+    assert "[rewrite_remote]" not in text
+    assert "# 远程重写规则" not in text
+    assert "rw.snippet" not in text
+    assert "http://b/rewrites/" not in text
+    assert not any("rw.snippet" in url for url in calls)
+    assert not (out / "rewrites").exists()
+    assert result.rewrite_count == 0
+
+    # neighbouring sections are unaffected
+    assert result.filter_count == 1
+    assert "rules/raw.githubusercontent.com/foo/bar/China.list" in text
+    assert "[filter_local]" in text
 
 
 def test_force_redownloads_existing_files(tmp_path):

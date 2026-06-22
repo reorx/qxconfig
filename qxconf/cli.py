@@ -39,6 +39,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Re-download rules even if already present in the output directory",
     )
     parser.add_argument(
+        "--disable-rewrite-remote",
+        action="store_true",
+        help="Exclude the whole [rewrite_remote] section (and skip downloading its rules)",
+    )
+    parser.add_argument(
         "--server-remote",
         nargs="?",
         const="lan",
@@ -55,6 +60,8 @@ def main(argv: list[str] | None = None) -> int:
     def progress(index: int, total: int, url: str) -> None:
         print(f"  [{index}/{total}] {url}", file=sys.stderr)
 
+    if args.disable_rewrite_remote:
+        print("Excluding [rewrite_remote] section.", file=sys.stderr)
     print("Mirroring remote resources (cached files skipped; --force to refresh)...", file=sys.stderr)
     try:
         result = build(
@@ -64,6 +71,7 @@ def main(argv: list[str] | None = None) -> int:
             out_dir=args.output,
             progress=progress,
             force=args.force,
+            disable_rewrite_remote=args.disable_rewrite_remote,
             server_remote=args.server_remote,
         )
     except Exception as exc:  # noqa: BLE001 - top-level boundary

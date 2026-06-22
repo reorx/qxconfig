@@ -18,6 +18,11 @@ Disabled lines (`enabled=false` or commented with `;`/`#`) are left untouched
 and never downloaded. Unsupported proxy types/plugins (e.g. `shadow-tls`) are
 skipped and reported instead of producing broken nodes.
 
+Rules already present in the output directory are reused; pass `--force` to
+re-download them. Pass `--disable-rewrite-remote` to exclude the whole
+`[rewrite_remote]` section (its header, body, and descriptive comment are
+removed; the next section's leading comment is preserved).
+
 With `--server-remote [TAG]` the nodes are not converted; instead the Clash
 config is copied to `<output>/clash/` and referenced as a `[server_remote]`
 subscription (`<base-url>/clash/<file>`), letting Quantumult X parse it on its
