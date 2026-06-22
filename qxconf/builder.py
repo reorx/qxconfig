@@ -127,29 +127,23 @@ def _rewrite_resource_lines(
 
 def _exclude_sections(lines: list[str], excluded: set[str]) -> list[str]:
     for name in excluded:
-        lines = _remove_section(lines, name)
+        lines = _empty_section(lines, name)
     return lines
 
 
-def _remove_section(lines: list[str], name: str) -> list[str]:
-    """Remove a whole section: its header, body, and own descriptive comment.
+def _empty_section(lines: list[str], name: str) -> list[str]:
+    """Drop a section's body but keep its header.
 
-    A trailing run of comments/blanks before the next header belongs to that
-    next section and is preserved.
+    Quantumult X requires every section's ``[header]`` to exist even when it
+    carries no entries, so removing the whole section breaks import. We keep the
+    header (and its own descriptive comment above it) and strip only the body.
+    The comment/blank run that introduces the next section is preserved.
     """
     header_idx = next(
         (i for i, ln in enumerate(lines) if section_name(ln) == name), None
     )
     if header_idx is None:
         return lines
-
-    # Extend the start upward over the section's own comment header + the blank
-    # separator above it.
-    start = header_idx
-    while start > 0 and lines[start - 1].lstrip().startswith("#"):
-        start -= 1
-    while start > 0 and lines[start - 1].strip() == "":
-        start -= 1
 
     # End at the next section header, then walk back so the comment/blank run
     # that introduces that next section is kept.
@@ -162,7 +156,8 @@ def _remove_section(lines: list[str], name: str) -> list[str]:
     ):
         end -= 1
 
-    return lines[:start] + lines[end:]
+    # Keep everything up to and including the header; drop the body in between.
+    return lines[: header_idx + 1] + lines[end:]
 
 
 def _inject_nodes(out_lines: list[str], node_lines: list[str], clash_name: str) -> list[str]:
@@ -190,8 +185,9 @@ def _use_server_remote(
     clash_dest.write_bytes(clash_path.read_bytes())
 
     url = f"{base}/clash/{clash_path.name}"
-    # QX [server_remote] syntax: a space before tag=, commas between the rest.
-    line = f"{url} tag={tag}, update-interval=172800, opt-parser=true, enabled=true"
+    # QX remote-resource syntax: the URL is the first comma-separated field,
+    # so the line is `url, tag=..., ...` (same as [filter_remote]).
+    line = f"{url}, tag={tag}, update-interval=172800, opt-parser=true, enabled=true"
     return _inject_server_remote(out_lines, line, clash_path.name), url
 
 

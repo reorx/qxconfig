@@ -20,8 +20,9 @@ skipped and reported instead of producing broken nodes.
 
 Rules already present in the output directory are reused; pass `--force` to
 re-download them. Pass `--disable-rewrite-remote` or `--disable-task-local` to
-exclude those sections entirely (header, body, and the section's own descriptive
-comment are removed; the next section's leading comment is preserved).
+empty those sections: the `[header]` (and its descriptive comment) is kept —
+Quantumult X requires every section header to exist — while the body is dropped
+and its resources are never downloaded.
 
 With `--server-remote [TAG]` the nodes are not converted; instead the Clash
 config is copied to `<output>/clash/` and referenced as a `[server_remote]`
@@ -30,7 +31,7 @@ side. `TAG` defaults to `lan`. Example output line:
 
 ```
 [server_remote]
-http://192.168.1.140:8888/clash/local-unified.yaml tag=lan, update-interval=172800, opt-parser=true, enabled=true
+http://192.168.1.140:8888/clash/local-unified.yaml, tag=lan, update-interval=172800, opt-parser=true, enabled=true
 ```
 
 ## Usage

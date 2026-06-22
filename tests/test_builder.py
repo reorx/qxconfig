@@ -190,9 +190,9 @@ def test_server_remote_mode_copies_clash_and_writes_subscription(tmp_path):
     copied = out / "clash" / "clash.yaml"
     assert copied.read_bytes() == clash.read_bytes()
 
-    # [server_remote] entry in QX syntax: space before tag=, commas after
+    # [server_remote] entry in QX syntax: the URL is the first comma field
     assert (
-        "http://b/clash/clash.yaml tag=lan, "
+        "http://b/clash/clash.yaml, tag=lan, "
         "update-interval=172800, opt-parser=true, enabled=true"
     ) in text
     assert result.server_remote_url == "http://b/clash/clash.yaml"
@@ -213,10 +213,23 @@ def test_server_remote_accepts_custom_tag(tmp_path):
     src, clash, out = _write_inputs(tmp_path)
     build(src, "http://b", clash, out, fetcher=lambda u: b"x", server_remote="prod")
     text = (out / "QX_Config.conf").read_text(encoding="utf-8")
-    assert "http://b/clash/clash.yaml tag=prod," in text
+    assert "http://b/clash/clash.yaml, tag=prod," in text
 
 
-def test_disable_rewrite_remote_excludes_section_and_skips_download(tmp_path):
+def _section_body(text: str, name: str) -> list[str]:
+    """Non-blank, non-comment lines between [name] and the next [section]."""
+    lines = text.splitlines()
+    start = next(i for i, ln in enumerate(lines) if ln.strip() == f"[{name}]")
+    body = []
+    for ln in lines[start + 1 :]:
+        if ln.strip().startswith("[") and ln.strip().endswith("]"):
+            break
+        if ln.strip() and not ln.lstrip().startswith("#"):
+            body.append(ln)
+    return body
+
+
+def test_disable_rewrite_remote_empties_section_and_skips_download(tmp_path):
     src, clash, out = _write_inputs(tmp_path)
     calls = []
 
@@ -229,9 +242,9 @@ def test_disable_rewrite_remote_excludes_section_and_skips_download(tmp_path):
     )
     text = (out / "QX_Config.conf").read_text(encoding="utf-8")
 
-    # whole section gone (header + its descriptive comment), nothing fetched
-    assert "[rewrite_remote]" not in text
-    assert "# 远程重写规则" not in text
+    # QX needs the header to exist; only the body is dropped, nothing fetched
+    assert "[rewrite_remote]" in text
+    assert _section_body(text, "rewrite_remote") == []
     assert "rw.snippet" not in text
     assert "http://b/rewrites/" not in text
     assert not any("rw.snippet" in url for url in calls)
@@ -245,15 +258,15 @@ def test_disable_rewrite_remote_excludes_section_and_skips_download(tmp_path):
     assert "[task_local]" in text
 
 
-def test_disable_task_local_excludes_whole_section(tmp_path):
+def test_disable_task_local_empties_section_keeping_header(tmp_path):
     src, clash, out = _write_inputs(tmp_path)
     build(src, "http://b", clash, out, fetcher=lambda u: b"x", disable_task_local=True)
     text = (out / "QX_Config.conf").read_text(encoding="utf-8")
 
-    # section, its body, and its descriptive comment are gone
-    assert "[task_local]" not in text
+    # header kept (app requires it), body emptied
+    assert "[task_local]" in text
+    assert _section_body(text, "task_local") == []
     assert "event-interaction" not in text
-    assert "# 定时任务" not in text
 
     # the next section's header survives intact
     assert "[mitm]" in text
